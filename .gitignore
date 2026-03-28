@@ -63,6 +63,11 @@ dmypy.json
 *.log
 logs/
 
+# SQLite / local databases
+*.db
+
 # Distribution / packaging
 .Python
 pip-wheel-metadata/
+
+
