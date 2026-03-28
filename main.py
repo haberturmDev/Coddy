@@ -14,6 +14,7 @@ from api.middleware.http_logging import HTTPLoggingMiddleware
 from api.routes.chat import router as chat_router
 from application.use_cases.chat_use_case import ChatUseCase
 from infrastructure.llm.groq_client import GroqClient
+from infrastructure.memory.in_memory_session_store import InMemorySessionStore
 
 
 @asynccontextmanager
@@ -21,7 +22,8 @@ async def lifespan(app: FastAPI):
     # Wire dependencies once at startup.
     # To swap providers: replace GroqClient with OpenAIClient / AnthropicClient.
     llm = GroqClient()
-    app.state.chat_use_case = ChatUseCase(llm=llm)
+    session_store = InMemorySessionStore()
+    app.state.chat_use_case = ChatUseCase(llm=llm, session_store=session_store)
     yield
     # Cleanup hooks go here (close DB pools, flush caches, etc.)
 
