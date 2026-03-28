@@ -4,8 +4,13 @@ from dotenv import load_dotenv
 
 load_dotenv()  # loads .env if present; no-op in prod when vars are injected
 
+from infrastructure.logging_config import configure_logging
+
+configure_logging()
+
 from fastapi import FastAPI
 
+from api.middleware.http_logging import HTTPLoggingMiddleware
 from api.routes.chat import router as chat_router
 from application.use_cases.chat_use_case import ChatUseCase
 from infrastructure.llm.groq_client import GroqClient
@@ -28,4 +33,5 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+app.add_middleware(HTTPLoggingMiddleware)
 app.include_router(chat_router)
