@@ -47,15 +47,12 @@ class GroqClient(LLMClient):
         async with httpx.AsyncClient(timeout=30) as client:
             response = await client.post(GROQ_API_URL, json=payload, headers=headers)
             status = response.status_code
-            text_preview = response.text[:2048] if response.text else ""
-            if len(response.text) > 2048:
-                text_preview = text_preview + "... (truncated)"
             log.info(
                 "http.outbound.response",
                 method="POST",
                 url=str(response.request.url),
                 status_code=status,
-                body_preview=text_preview,
+                body=response.text or "",
             )
             response.raise_for_status()
 

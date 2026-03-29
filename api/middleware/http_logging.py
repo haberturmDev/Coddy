@@ -14,7 +14,6 @@ from starlette.responses import Response
 
 log = structlog.get_logger(__name__)
 
-_MAX_BODY_BYTES = 16_384
 _SENSITIVE_HEADER_KEYS = frozenset(
     {
         "authorization",
@@ -27,13 +26,10 @@ _SENSITIVE_HEADER_KEYS = frozenset(
 )
 
 
-def _truncate_bytes(data: bytes, max_len: int = _MAX_BODY_BYTES) -> str:
+def _body_as_utf8(data: bytes) -> str:
     if not data:
         return ""
-    text = data.decode("utf-8", errors="replace")
-    if len(data) > max_len:
-        return text[:max_len] + f"... (truncated, {len(data)} bytes total)"
-    return text
+    return data.decode("utf-8", errors="replace")
 
 
 def _safe_headers(raw_headers: Iterable[tuple[bytes, bytes]]) -> dict[str, str]:
@@ -97,7 +93,7 @@ class HTTPLoggingMiddleware(BaseHTTPMiddleware):
                 query=str(request.url.query) if request.url.query else None,
                 client=client,
                 headers=_safe_headers(request.scope.get("headers") or ()),
-                body=_truncate_bytes(body_bytes),
+                body=_body_as_utf8(body_bytes),
             )
 
             start = time.perf_counter()
@@ -115,7 +111,7 @@ class HTTPLoggingMiddleware(BaseHTTPMiddleware):
                 status_code=response.status_code,
                 duration_ms=round(duration_ms, 3),
                 headers=_safe_headers_mapping(response.headers),
-                body=_truncate_bytes(resp_body),
+                body=_body_as_utf8(resp_body),
             )
             return response
         finally:

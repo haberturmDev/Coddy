@@ -17,10 +17,6 @@ def _pretty_json_dumps(event_dict: Any, **kwargs: Any) -> str:
     return json.dumps(event_dict, **kwargs) + "\n\n"
 
 
-def _looks_truncated_json(s: str) -> bool:
-    return "... (truncated" in s
-
-
 def _embed_json_strings_for_json_renderer(
     _logger: Any, _method_name: str, event_dict: EventDict
 ) -> EventDict:
@@ -28,8 +24,6 @@ def _embed_json_strings_for_json_renderer(
     for key in ("body", "body_preview"):
         val = event_dict.get(key)
         if not isinstance(val, str) or not val.strip():
-            continue
-        if _looks_truncated_json(val):
             continue
         try:
             event_dict[key] = json.loads(val)
@@ -54,9 +48,6 @@ def _pretty_json_stack_for_console(
         if val is None or val == "":
             continue
         if isinstance(val, str):
-            # if _looks_truncated_json(val):
-            #     blocks.append(f"{key} (truncated, raw)=\n{val}")
-            #     continue
             try:
                 parsed = json.loads(val)
             except json.JSONDecodeError:
