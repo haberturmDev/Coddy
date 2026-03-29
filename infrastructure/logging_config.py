@@ -54,9 +54,9 @@ def _pretty_json_stack_for_console(
         if val is None or val == "":
             continue
         if isinstance(val, str):
-            if _looks_truncated_json(val):
-                blocks.append(f"{key} (truncated, raw)=\n{val}")
-                continue
+            # if _looks_truncated_json(val):
+            #     blocks.append(f"{key} (truncated, raw)=\n{val}")
+            #     continue
             try:
                 parsed = json.loads(val)
             except json.JSONDecodeError:

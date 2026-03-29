@@ -11,6 +11,13 @@ class ChatRequest(BaseModel):
     )
 
 
+class TokenUsage(BaseModel):
+    prompt_tokens: int
+    completion_tokens: int
+    total_tokens: int
+
+
 class ChatResponse(BaseModel):
     response: str = Field(..., description="Assistant reply")
     session_id: str = Field(..., description="Chat session id for follow-up turns")
+    usage: TokenUsage

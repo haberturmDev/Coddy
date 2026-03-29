@@ -4,7 +4,7 @@ from typing import Optional
 import httpx
 import structlog
 from domain.models.conversation import Message
-from domain.ports.llm_client import LLMClient
+from domain.ports.llm_client import LLMClient, LLMResponse
 
 log = structlog.get_logger(__name__)
 
@@ -21,7 +21,7 @@ class GroqClient(LLMClient):
         self._api_key = api_key or os.environ["GROQ_API_KEY"]
         self._model = model
 
-    async def generate(self, messages: list[Message]) -> str:
+    async def generate(self, messages: list[Message]) -> LLMResponse:
         payload = {
             "model": self._model,
             "messages": [m.to_dict() for m in messages],
@@ -60,4 +60,10 @@ class GroqClient(LLMClient):
             response.raise_for_status()
 
         data = response.json()
-        return data["choices"][0]["message"]["content"]
+        usage = data.get("usage") or {}
+        return LLMResponse(
+            content=data["choices"][0]["message"]["content"],
+            prompt_tokens=int(usage.get("prompt_tokens") or 0),
+            completion_tokens=int(usage.get("completion_tokens") or 0),
+            total_tokens=int(usage.get("total_tokens") or 0),
+        )

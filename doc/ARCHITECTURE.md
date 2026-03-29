@@ -58,4 +58,9 @@ infrastructure/
 | Another database | New engine factory + adapter package under `infrastructure/`, same ports |
 
 ## Endpoint
-`POST /chat` — `{"message": "...", "session_id": "<optional>"}` → `{"response": "...", "session_id": "..."}`
+`POST /chat` — `{"message": "...", "session_id": "<optional>"}` → `{"response": "...", "session_id": "...", "usage": { ... }}`
+
+## Token management
+- The LLM port returns structured usage (`LLMResponse`: prompt, completion, and total token counts from the provider).
+- The API exposes a `usage` object on every chat response: `prompt_tokens`, `completion_tokens`, and `total_tokens` (full prompt + reply for that request, as reported by the provider).
+

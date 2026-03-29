@@ -35,7 +35,12 @@ Response:
 ```json
 {
   "response": "Hi! How can I help you?",
-  "session_id": "550e8400-e29b-41d4-a716-446655440000"
+  "session_id": "550e8400-e29b-41d4-a716-446655440000",
+  "usage": {
+    "prompt_tokens": 42,
+    "completion_tokens": 10,
+    "total_tokens": 52
+  }
 }
 ```
 

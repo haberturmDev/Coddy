@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, Request
-from api.schemas.chat import ChatRequest, ChatResponse
+from api.schemas.chat import ChatRequest, ChatResponse, TokenUsage
 
 router = APIRouter()
 
@@ -13,10 +13,18 @@ async def chat(body: ChatRequest, request: Request) -> ChatResponse:
     """
     use_case = request.app.state.chat_use_case
     try:
-        reply, session_id = await use_case.execute(
+        result = await use_case.execute(
             body.message, session_id=body.session_id
         )
     except Exception as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
-    return ChatResponse(response=reply, session_id=session_id)
+    return ChatResponse(
+        response=result.reply,
+        session_id=result.session_id,
+        usage=TokenUsage(
+            prompt_tokens=result.usage.prompt_tokens,
+            completion_tokens=result.usage.completion_tokens,
+            total_tokens=result.usage.total_tokens,
+        ),
+    )
