@@ -16,20 +16,24 @@ Dependencies always point inward: `api` → `application` → `domain` ← `infr
 ```
 main.py                          # DI wiring + app startup (engine, create_all, adapters)
 api/
-  schemas/chat.py                # Pydantic request/response models
+  schemas/chat.py                # Pydantic request/response models (incl. MemoryConfigSchema)
   routes/chat.py                 # POST /chat — thin HTTP handler
 application/
   use_cases/chat_use_case.py     # Orchestration logic (no I/O)
+  memory/
+    memory_config.py             # MemoryConfig, MemoryStrategies, SummarizationParams dataclasses
+    memory_manager.py            # MemoryManager — central extension point for memory strategies
+    summarization_service.py     # SummarizationService — compresses old messages via LLMClient
 domain/
-  ports/llm_client.py            # LLMClient ABC — the port
+  ports/llm_client.py            # LLMClient ABC — the port (supports optional model override)
   ports/session_store.py         # SessionStore ABC — conversation persistence
-  models/conversation.py         # Message, Role, Conversation dataclasses
+  models/conversation.py         # Message, Role, Conversation dataclasses (incl. summary field)
 infrastructure/
   llm/groq_client.py             # GroqClient — the adapter
   memory/in_memory_session_store.py  # InMemorySessionStore — dev/tests; no DB
   sqlite/
     engine.py                    # create_sqlite_engine — shared Engine factory
-    models.py                    # SQLAlchemy Base + table mappings (sessions, messages)
+    models.py                    # SQLAlchemy Base + table mappings (sessions w/ summary, messages)
     sqlite_session_store.py      # SQLiteSessionStore — SessionStore adapter
 ```
 
@@ -56,11 +60,85 @@ infrastructure/
 | New LLM provider | New class in `infrastructure/llm/`, swap in `main.py` |
 | New endpoint | New schema in `api/schemas/`, route in `api/routes/` |
 | Another database | New engine factory + adapter package under `infrastructure/`, same ports |
+| New memory strategy | Add method in `MemoryManager`, dispatch from `build_context` |
 
 ## Endpoint
-`POST /chat` — `{"message": "...", "session_id": "<optional>"}` → `{"response": "...", "session_id": "...", "usage": { ... }}`
+`POST /chat` — `{"message": "...", "session_id": "<optional>", "memory_config": {...}}` → `{"response": "...", "session_id": "...", "usage": { ... }}`
 
 ## Token management
 - The LLM port returns structured usage (`LLMResponse`: prompt, completion, and total token counts from the provider).
 - The API exposes a `usage` object on every chat response: `prompt_tokens`, `completion_tokens`, and `total_tokens` (full prompt + reply for that request, as reported by the provider).
+
+## Memory system
+
+The memory system lives entirely in `application/memory/` and is controlled via the optional `memory_config` request field.
+
+### Components
+
+- **`MemoryConfig`** — dataclass carrying strategy flags and per-strategy parameters; deserialized from the `memory_config` JSON field in the request.
+- **`MemoryManager`** — the single extension seam for all memory strategies. `build_context(conversation, current_message, config)` returns `(llm_messages, new_summary)`. Adding a new strategy means adding a private method here and dispatching it from `build_context` — `ChatUseCase` never changes.
+- **`SummarizationService`** — calls `LLMClient.generate()` with a dedicated compression prompt and a (possibly different) model to produce a concise summary of old messages.
+
+### Config resolution — sticky-session behavior
+
+`memory_config` is **session-scoped**, not per-request. Once set, it is serialized as JSON and stored in the `sessions` table under `memory_config_json`. On every subsequent turn the stored config is loaded automatically, so you only need to send `memory_config` once per session.
+
+Resolution order per request:
+
+1. `memory_config` present in the request → use it and **overwrite** the stored session config
+2. `memory_config` absent, but a config is stored for the session → use the stored config
+3. Neither exists → no memory strategy; full history is sent to the LLM (original behaviour)
+
+### Summarization flow
+
+```
+history = [msg_1 ... msg_M]   (all messages for the session, excluding current)
+old_messages    = history[:-N]   (summarized if non-empty)
+recent_messages = history[-N:]
+
+LLM context sent:
+  [SYSTEM: system_prompt]
+  [SYSTEM: "Previous conversation summary:\n{summary}"]  ← only if summary exists
+  [recent_messages]
+  [USER: current_message]
+```
+
+`N` defaults to `10`. If `len(history) <= N` no summarization call is made but an existing stored summary is still forwarded.
+
+### Request schema
+
+```json
+{
+  "message": "Hello!",
+  "session_id": "optional-uuid",
+  "memory_config": {
+    "strategies": { "summarization": true },
+    "params": {
+      "summarization": {
+        "last_n_messages": 10,
+        "model": "llama-3.1-8b-instant"
+      }
+    }
+  }
+}
+```
+
+All fields inside `memory_config` are optional and fall back to their defaults. Omit `memory_config` entirely on follow-up turns — the session remembers it.
+
+### Summary and config persistence
+
+The `sessions` table carries two new nullable text columns:
+
+| Column | Purpose |
+|---|---|
+| `summary` | Latest compressed summary of old messages |
+| `memory_config_json` | JSON-serialized `MemoryConfig` stored for the session |
+
+Both are loaded into the `Conversation` domain object on `get_or_create` and written back on `save`. Messages are never deleted — the summary logically replaces old messages in the LLM context only.
+
+> **Existing databases:** run the following once, or delete `coddy.db` to let `create_all` recreate the schema:
+> ```sql
+> ALTER TABLE sessions ADD COLUMN summary TEXT;
+> ALTER TABLE sessions ADD COLUMN memory_config_json TEXT;
+> ```
 

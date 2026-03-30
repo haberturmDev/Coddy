@@ -29,6 +29,7 @@ class SQLiteSessionStore(SessionStore):
                 return Conversation(
                     messages=[],
                     system_prompt=record.system_prompt,
+                    memory_config_json=record.memory_config_json,
                 )
 
             msg_stmt = (
@@ -48,6 +49,8 @@ class SQLiteSessionStore(SessionStore):
             return Conversation(
                 messages=messages,
                 system_prompt=record.system_prompt,
+                summary=record.summary,
+                memory_config_json=record.memory_config_json,
             )
 
     def save(self, session_id: str, conversation: Conversation) -> None:
@@ -60,6 +63,8 @@ class SQLiteSessionStore(SessionStore):
                     f"Session {session_id!r} not found; call get_or_create first."
                 )
             record.system_prompt = conversation.system_prompt
+            record.summary = conversation.summary
+            record.memory_config_json = conversation.memory_config_json
 
             existing = sess.scalar(
                 select(func.count())

@@ -1,6 +1,7 @@
 import os
 from typing import Optional
 
+
 import httpx
 import structlog
 from domain.models.conversation import Message
@@ -21,9 +22,12 @@ class GroqClient(LLMClient):
         self._api_key = api_key or os.environ["GROQ_API_KEY"]
         self._model = model
 
-    async def generate(self, messages: list[Message]) -> LLMResponse:
+    async def generate(
+        self, messages: list[Message], model: Optional[str] = None
+    ) -> LLMResponse:
+        resolved_model = model or self._model
         payload = {
-            "model": self._model,
+            "model": resolved_model,
             "messages": [m.to_dict() for m in messages],
         }
         headers = {
@@ -39,7 +43,7 @@ class GroqClient(LLMClient):
             "http.outbound.request",
             method="POST",
             url=GROQ_API_URL,
-            model=self._model,
+            model=resolved_model,
             message_count=len(messages),
             headers=headers_for_log,
             body=payload,

@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from typing import Optional
 
 from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
@@ -18,6 +19,10 @@ class SessionRecord(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
+    )
+    summary: Mapped[Optional[str]] = mapped_column(Text, nullable=True, default=None)
+    memory_config_json: Mapped[Optional[str]] = mapped_column(
+        Text, nullable=True, default=None
     )
 
 

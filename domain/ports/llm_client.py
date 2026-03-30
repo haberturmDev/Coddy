@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from typing import Optional
 
 from domain.models.conversation import Message
 
@@ -16,6 +17,13 @@ class LLMClient(ABC):
     """Port: any LLM provider must implement this interface."""
 
     @abstractmethod
-    async def generate(self, messages: list[Message]) -> LLMResponse:
-        """Send a list of messages and return the assistant's reply and usage."""
+    async def generate(
+        self, messages: list[Message], model: Optional[str] = None
+    ) -> LLMResponse:
+        """Send a list of messages and return the assistant's reply and usage.
+
+        Args:
+            messages: Conversation messages to send.
+            model: Optional model override; uses the client's default when None.
+        """
         ...

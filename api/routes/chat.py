@@ -12,9 +12,12 @@ async def chat(body: ChatRequest, request: Request) -> ChatResponse:
     which keeps routes free of infrastructure concerns.
     """
     use_case = request.app.state.chat_use_case
+    memory_config = body.memory_config.to_memory_config() if body.memory_config else None
     try:
         result = await use_case.execute(
-            body.message, session_id=body.session_id
+            body.message,
+            session_id=body.session_id,
+            memory_config=memory_config,
         )
     except Exception as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
